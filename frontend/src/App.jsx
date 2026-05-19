@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Sun, Moon, LogOut, Users, CalendarCheck, BarChart3, DollarSign, Bot } from 'lucide-react'
 import Login from './pages/Login'
 import Students from './pages/Students'
+import Attendance from './pages/Attendance'
+import Marks from './pages/Marks'
 
 const NAV = [
   { id: 'students',   label: 'Students',   icon: Users },
@@ -74,8 +76,8 @@ export default function App() {
       {/* Main content */}
       <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
         {page === 'students'   && <Students />}
-        {page === 'attendance' && <ComingSoon title="Attendance" />}
-        {page === 'marks'      && <ComingSoon title="Marks" />}
+        {page === 'attendance' && <Attendance />}
+        {page === 'marks' && <Marks />}
         {page === 'fees'       && <ComingSoon title="Fees" />}
         {page === 'ai'         && <ComingSoon title="AI Chat" />}
       </main>

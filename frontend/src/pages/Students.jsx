@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Trash2, UserCheck, RefreshCw } from 'lucide-react'
+import { Search, Plus, Trash2, UserCheck, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../api'
+
+const PAGE_SIZE = 10
 
 export default function Students() {
   const [students, setStudents] = useState([])
+  const [total,    setTotal]    = useState(0)
+  const [page,     setPage]     = useState(1)
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState('')
   const [search,   setSearch]   = useState('')
@@ -11,11 +15,14 @@ export default function Students() {
   const [adding,   setAdding]   = useState(false)
   const [form,     setForm]     = useState({ full_name: '', roll_no: '', grade: '', phone: '', parent_name: '', parent_phone: '' })
 
-  const load = async () => {
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+
+  const load = async (p = page) => {
     setLoading(true)
     try {
-      const res = await api.getStudents({ search, page: 1, page_size: 50 })
+      const res = await api.getStudents({ search, page: p, page_size: PAGE_SIZE })
       setStudents(res.data.items)
+      setTotal(res.data.total)
     } catch {
       setError('Failed to load students')
     } finally {
@@ -23,7 +30,14 @@ export default function Students() {
     }
   }
 
-  useEffect(() => { load() }, [search])
+  useEffect(() => {
+    setPage(1)
+    load(1)
+  }, [search])
+
+  useEffect(() => {
+    load(page)
+  }, [page])
 
   const handleAdd = async () => {
     if (!form.full_name || !form.roll_no || !form.grade)
@@ -34,7 +48,7 @@ export default function Students() {
       await api.addStudent({ ...form, grade: parseInt(form.grade) })
       setForm({ full_name: '', roll_no: '', grade: '', phone: '', parent_name: '', parent_phone: '' })
       setShowForm(false)
-      load()
+      load(1)
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to add student')
     } finally {
@@ -46,7 +60,7 @@ export default function Students() {
     if (!confirm(`Delete ${name}?`)) return
     try {
       await api.deleteStudent(id)
-      load()
+      load(page)
     } catch {
       setError('Failed to delete')
     }
@@ -59,11 +73,11 @@ export default function Students() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Students</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 2 }}>
-            {students.length} students enrolled
+            {total} students enrolled
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={load} className="btn btn-ghost">
+          <button onClick={() => load(page)} className="btn btn-ghost">
             <RefreshCw size={14} /> Refresh
           </button>
           <button onClick={() => setShowForm(f => !f)} className="btn btn-primary">
@@ -174,8 +188,8 @@ export default function Students() {
                   <td>
                     <button onClick={() => handleDelete(s.id, s.full_name)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 4 }}
-                      onMouseEnter={e => e.target.style.color = '#ef4444'}
-                      onMouseLeave={e => e.target.style.color = 'var(--text3)'}>
+                      onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}>
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -185,6 +199,43 @@ export default function Students() {
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text2)' }}>
+            Page {page} of {totalPages} — {total} students
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="btn btn-ghost"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setPage(p)}
+                className="btn"
+                style={{
+                  background: p === page ? 'var(--primary)' : 'transparent',
+                  color: p === page ? 'white' : 'var(--text2)',
+                  border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border)'}`,
+                  minWidth: 36,
+                }}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="btn btn-ghost"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
