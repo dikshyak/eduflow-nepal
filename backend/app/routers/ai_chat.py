@@ -33,6 +33,8 @@ async def ai_chat(
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(500, f"AI service error: {str(e)}")
 
 

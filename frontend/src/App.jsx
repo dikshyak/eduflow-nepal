@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Students from './pages/Students'
 import Attendance from './pages/Attendance'
 import Marks from './pages/Marks'
+import Fees from './pages/Fees'
+import AIChat from './pages/AIChat'
 
 const NAV = [
   { id: 'students',   label: 'Students',   icon: Users },
@@ -78,8 +80,8 @@ export default function App() {
         {page === 'students'   && <Students />}
         {page === 'attendance' && <Attendance />}
         {page === 'marks' && <Marks />}
-        {page === 'fees'       && <ComingSoon title="Fees" />}
-        {page === 'ai'         && <ComingSoon title="AI Chat" />}
+        {page === 'fees' && <Fees />}
+        {page === 'ai' && <AIChat />}
       </main>
     </div>
   )

@@ -27,5 +27,6 @@ export const api = {
   addMark:     (data)   => client.post('/marks', data),
   getMarks:    (id)     => client.get(`/marks/student/${id}`),
   getRankings: (id)     => client.get(`/marks/exam/${id}/rankings`),
-  askAI: (question)     => client.post('/ai/chat', { question }),
+  askAI:       (question) => client.post('/ai/chat', { question }),
+  addFee:      (data)   => client.post('/fees', data),
 }

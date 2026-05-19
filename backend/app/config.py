@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     # AI
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
 
     # App
     DEBUG: bool = True
