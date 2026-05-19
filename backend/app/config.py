@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # App
     DEBUG: bool = True
-    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 
     @property
     def origins_list(self) -> List[str]:

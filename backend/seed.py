@@ -1,178 +1,92 @@
-"""
-Seed script — creates demo school, admin user, teachers, students,
-attendance records, exams, marks, and fees.
-
-Run: python seed.py
-"""
-
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, func
 from app.config import settings
-from app.models import (
-    Base, School, User, Class, Student,
-    Attendance, Exam, Mark, FeeRecord,
-    UserRole, AttendanceStatus, ExamType, FeeStatus
-)
-from app.auth import hash_password
+from app.models import *
 from datetime import date, timedelta
 import random
 
+STUDENTS = [
+    ('011','Kabita Poudel','9841KKXXXX','Mr. Poudel','9841KKYYYY'),
+    ('012','Laxman Basnet','9851LLXXXX','Mrs. Basnet','9851LLYYYY'),
+    ('013','Manisha Koirala','9861MMXXXX','Mr. Koirala','9861MMYYYY'),
+    ('014','Nabin Karki','9841NNXXXX','Mrs. Karki','9841NNYYYY'),
+    ('015','Ojasvi Shrestha','9851OOXXXX','Mr. Shrestha','9851OOYYYY'),
+    ('016','Pratik Maharjan','9861PPXXXX','Mrs. Maharjan','9861PPYYYY'),
+    ('017','Rima Lama','9841RRXXXX','Mr. Lama','9841RRYYYY'),
+    ('018','Sagar Rai','9851SSXXXX','Mrs. Rai','9851SSYYYY'),
+    ('019','Tina Gurung','9861TTXXXX','Mr. Gurung','9861TTYYYY'),
+    ('020','Ujwal Thapa','9841UUXXXX','Mrs. Thapa','9841UUYYYY'),
+    ('021','Vandana Sharma','9851VVXXXX','Mr. Sharma','9851VVYYYY'),
+    ('022','Wishal Magar','9861WWXXXX','Mrs. Magar','9861WWYYYY'),
+    ('023','Xina Tamang','9841XXXXXX','Mr. Tamang','9841XXYYYY'),
+    ('024','Yubraj Pun','9851YYXXXX','Mrs. Pun','9851YYYYYY'),
+    ('025','Zara Shrestha','9861ZZXXXX','Mr. Shrestha','9861ZZYYYY'),
+    ('026','Anil Bajracharya','9841AAXXXX','Mrs. Bajracharya','9841AAYYYY'),
+    ('027','Binita Dhakal','9851BBXXXX','Mr. Dhakal','9851BBYYYY'),
+    ('028','Chirag Acharya','9861CCXXXX','Mrs. Acharya','9861CCYYYY'),
+    ('029','Dipa Rai','9841DDXXXX','Mr. Rai','9841DDYYYY'),
+    ('030','Emon Lama','9851EEXXXX','Mrs. Lama','9851EEYYYY'),
+    ('031','Farida Miya','9861FFXXXX','Mr. Miya','9861FFYYYY'),
+    ('032','Ganesh Parajuli','9841GGXXXX','Mrs. Parajuli','9841GGYYYY'),
+    ('033','Hema Adhikari','9851HHXXXX','Mr. Adhikari','9851HHYYYY'),
+    ('034','Ishan Khadka','9861IIXXXX','Mrs. Khadka','9861IIYYYY'),
+    ('035','Jyoti Karmacharya','9841JJXXXX','Mr. Karmacharya','9841JJYYYY'),
+    ('036','Kamal Regmi','9851KKXXXX','Mrs. Regmi','9851KKYYYY'),
+    ('037','Lila Shrestha','9861LLXXXX','Mr. Shrestha','9861LLYYYY'),
+    ('038','Mohan Bhandari','9841MMXXXX','Mrs. Bhandari','9841MMYYYY'),
+    ('039','Nisha Nepal','9851NNXXXX','Mr. Nepal','9851NNYYYY'),
+    ('040','Om Prakash Shah','9861OOXXXX','Mrs. Shah','9861OOYYYY'),
+    ('041','Puja Maharjan','9841PPXXXX','Mr. Maharjan','9841PPYYYY'),
+    ('042','Rohan Dahal','9851RRXXXX','Mrs. Dahal','9851RRYYYY'),
+    ('043','Sunita Rai','9861SSXXXX','Mr. Rai','9861SSYYYY'),
+    ('044','Tilak Ghimire','9841TTXXXX','Mrs. Ghimire','9841TTYYYY'),
+    ('045','Uma Devi Sharma','9851UUXXXX','Mr. Sharma','9851UUYYYY'),
+    ('046','Vikram Poudel','9861VVXXXX','Mrs. Poudel','9861VVYYYY'),
+    ('047','Wangchuk Lama','9841WWXXXX','Mr. Lama','9841WWYYYY'),
+    ('048','Yamuna Thapa','9851YYXXXX','Mrs. Thapa','9851YYYYYY'),
+    ('049','Zenith Karki','9861ZZXXXX','Mr. Karki','9861ZZYYYY'),
+    ('050','Arjun Basnet','9841ABXXXX','Mrs. Basnet','9841ABYYYY'),
+]
 
-async def seed():
+async def run():
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
-    SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with SessionLocal() as db:
-        # ── School
-        school = School(
-            name="Kathmandu Model School",
-            address="Putalisadak, Kathmandu",
-            phone="01-4XXXXXX",
-            email="kms@school.edu.np"
-        )
-        db.add(school)
-        await db.flush()
-
-        # ── Users
-        admin = User(
-            school_id=school.id,
-            email="admin@kms.edu.np",
-            hashed_password=hash_password("Admin@1234"),
-            full_name="School Admin",
-            role=UserRole.school_admin,
-        )
-        teacher1 = User(
-            school_id=school.id,
-            email="teacher1@kms.edu.np",
-            hashed_password=hash_password("Teacher@1234"),
-            full_name="Ram Prasad Sharma",
-            role=UserRole.teacher,
-        )
-        teacher2 = User(
-            school_id=school.id,
-            email="teacher2@kms.edu.np",
-            hashed_password=hash_password("Teacher@1234"),
-            full_name="Sita Devi Thapa",
-            role=UserRole.teacher,
-        )
-        db.add_all([admin, teacher1, teacher2])
-        await db.flush()
-
-        # ── Classes
-        class_10a = Class(school_id=school.id, name="Grade 10", section="A", teacher_id=teacher1.id)
-        class_10b = Class(school_id=school.id, name="Grade 10", section="B", teacher_id=teacher2.id)
-        class_9a  = Class(school_id=school.id, name="Grade 9",  section="A", teacher_id=teacher1.id)
-        db.add_all([class_10a, class_10b, class_9a])
-        await db.flush()
-
-        # ── Students
-        student_data = [
-            ("001", "Aarav Sharma",      class_10a.id, "9841XXXXXX", "Mr. Sharma",  "9841YYYYYY"),
-            ("002", "Bina Thapa",        class_10a.id, "9851XXXXXX", "Mrs. Thapa",  "9851YYYYYY"),
-            ("003", "Chetan Rai",        class_10a.id, "9861XXXXXX", "Mr. Rai",     "9861YYYYYY"),
-            ("004", "Dipika Gurung",     class_10a.id, "9841AAXXXX", "Mr. Gurung",  "9841AAYYYY"),
-            ("005", "Eshan Magar",       class_10a.id, "9851BBXXXX", "Mrs. Magar",  "9851BBYYYY"),
-            ("006", "Fiona Shrestha",    class_10b.id, "9861CCXXXX", "Mr. Shrestha","9861CCYYYY"),
-            ("007", "Gaurav Tamang",     class_10b.id, "9841DDXXXX", "Mrs. Tamang", "9841DDYYYY"),
-            ("008", "Hira Karki",        class_10b.id, "9851EEXXXX", "Mr. Karki",   "9851EEYYYY"),
-            ("009", "Isha Bhattarai",    class_9a.id,  "9861FFXXXX", "Mrs. Bhattarai","9861FFYYYY"),
-            ("010", "Jeevan Adhikari",   class_9a.id,  "9841GGXXXX", "Mr. Adhikari","9841GGYYYY"),
-        ]
-        students = []
-        for roll, name, cid, phone, pname, pphone in student_data:
+    S = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with S() as db:
+        school = (await db.execute(select(School))).scalars().first()
+        cls = (await db.execute(select(Class))).scalars().first()
+        today = date.today()
+        statuses = [AttendanceStatus.present]*8 + [AttendanceStatus.absent, AttendanceStatus.late]
+        added = 0
+        for roll, name, phone, pname, pphone in STUDENTS:
+            ex = (await db.execute(
+                select(Student).where(Student.roll_no == roll, Student.school_id == school.id)
+            )).scalar_one_or_none()
+            if ex:
+                continue
             s = Student(
-                school_id=school.id, class_id=cid, roll_no=roll,
-                full_name=name, phone=phone,
-                parent_name=pname, parent_phone=pphone
+                school_id=school.id, class_id=cls.id,
+                roll_no=roll, full_name=name,
+                phone=phone, parent_name=pname, parent_phone=pphone
             )
             db.add(s)
-            students.append(s)
-        await db.flush()
-
-        # ── Attendance (last 30 days)
-        today = date.today()
-        statuses = [AttendanceStatus.present] * 8 + [AttendanceStatus.absent, AttendanceStatus.late]
-        for student in students:
+            await db.flush()
             for i in range(30):
                 d = today - timedelta(days=i)
-                if d.weekday() < 5:  # skip weekends
+                if d.weekday() < 5:
                     db.add(Attendance(
-                        school_id=school.id,
-                        student_id=student.id,
-                        date=d.isoformat(),
-                        status=random.choice(statuses),
-                        marked_by=teacher1.id,
+                        school_id=school.id, student_id=s.id,
+                        date=d.isoformat(), status=random.choice(statuses)
                     ))
-
-        # ── Exams
-        math_exam = Exam(
-            school_id=school.id, class_id=class_10a.id,
-            name="First Terminal 2081", subject="Mathematics",
-            exam_type=ExamType.mid_term, full_marks=100, pass_marks=40,
-            date=(today - timedelta(days=10)).isoformat()
-        )
-        science_exam = Exam(
-            school_id=school.id, class_id=class_10a.id,
-            name="First Terminal 2081", subject="Science",
-            exam_type=ExamType.mid_term, full_marks=100, pass_marks=40,
-            date=(today - timedelta(days=9)).isoformat()
-        )
-        db.add_all([math_exam, science_exam])
-        await db.flush()
-
-        # ── Marks
-        for student in students[:8]:  # grade 10 students
-            for exam in [math_exam, science_exam]:
-                marks_val = random.uniform(35, 98)
-                pct = marks_val / exam.full_marks * 100
-                grade = (
-                    "A+" if pct >= 90 else "A" if pct >= 80 else
-                    "B+" if pct >= 70 else "B" if pct >= 60 else
-                    "C+" if pct >= 50 else "C" if pct >= 40 else "F"
-                )
-                db.add(Mark(
-                    school_id=school.id,
-                    student_id=student.id,
-                    exam_id=exam.id,
-                    marks=round(marks_val, 1),
-                    grade=grade,
-                ))
-
-        # ── Fee records
-        for student in students:
-            # 2 months of fees — some paid, some pending
-            for month_offset in [0, 1]:
-                due = (today - timedelta(days=30 * month_offset)).replace(day=15)
-                status = random.choice(
-                    [FeeStatus.paid, FeeStatus.paid, FeeStatus.pending, FeeStatus.overdue]
-                )
-                db.add(FeeRecord(
-                    school_id=school.id,
-                    student_id=student.id,
-                    amount=3500.0,
-                    fee_type="tuition",
-                    due_date=due.isoformat(),
-                    paid_date=due.isoformat() if status == FeeStatus.paid else None,
-                    status=status,
-                ))
-
+            db.add(FeeRecord(
+                school_id=school.id, student_id=s.id,
+                amount=3500.0, fee_type='tuition',
+                status=random.choice([FeeStatus.paid, FeeStatus.pending, FeeStatus.overdue])
+            ))
+            added += 1
         await db.commit()
-
-    print("\n✓ Seed complete!")
-    print("─" * 40)
-    print(f"School:  Kathmandu Model School")
-    print(f"Admin:   admin@kms.edu.np  /  Admin@1234")
-    print(f"Teacher: teacher1@kms.edu.np  /  Teacher@1234")
-    print(f"Students: {len(students)} created across 3 classes")
-    print(f"API docs: http://localhost:8000/docs")
-    print("─" * 40)
-
+        total = (await db.execute(select(func.count()).select_from(Student))).scalar()
+        print(f'Added {added} students. Total: {total}')
     await engine.dispose()
 
-
-if __name__ == "__main__":
-    asyncio.run(seed())
+asyncio.run(run())
