@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, CheckCircle, Clock, AlertCircle, Plus } from 'lucide-react'
+import { RefreshCw, CheckCircle, Clock, AlertCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../api'
 
 const STATUS_CONFIG = {
@@ -9,12 +9,22 @@ const STATUS_CONFIG = {
   waived:  { label: 'Waived',  color: '#94a3b8', bg: '#f1f5f9', badge: 'badge-gray',  icon: CheckCircle },
 }
 
+function getDisplayDate(f) {
+  if (f.status === 'paid')    return { date: f.paid_date || f.due_date || '—', label: 'Paid on',  color: '#22c55e' }
+  if (f.status === 'overdue') return { date: f.due_date || '—',                label: 'Was due',  color: '#ef4444' }
+  if (f.status === 'pending') return { date: f.due_date || '—',                label: 'Due by',   color: '#f59e0b' }
+  return { date: '—', label: '', color: 'var(--text2)' }
+}
+
+const PAGE_SIZE = 20
+
 export default function Fees() {
   const [fees,      setFees]      = useState([])
   const [students,  setStudents]  = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
   const [search,    setSearch]    = useState('')
+  const [page,      setPage]      = useState(1)
   const [showForm,  setShowForm]  = useState(false)
   const [saving,    setSaving]    = useState(false)
   const [editId,    setEditId]    = useState(null)
@@ -46,30 +56,22 @@ export default function Fees() {
       const today = new Date().toISOString().split('T')[0]
       await api.updateFee(feeId, { status: 'paid', paid_date: today })
       loadAll()
-    } catch {
-      setError('Failed to update fee')
-    }
+    } catch { setError('Failed to update fee') }
   }
 
   const handleUpdateStatus = async (feeId, status) => {
     try {
       await api.updateFee(feeId, { status })
       loadAll()
-    } catch {
-      setError('Failed to update fee')
-    }
+    } catch { setError('Failed to update fee') }
   }
 
   const handleSaveEdit = async () => {
     try {
-      await api.updateFee(editId, {
-        due_date: editForm.due_date || null,
-      })
+      await api.updateFee(editId, { due_date: editForm.due_date || null })
       setEditId(null)
       loadAll()
-    } catch {
-      setError('Failed to save changes')
-    }
+    } catch { setError('Failed to save changes') }
   }
 
   const handleAddFee = async () => {
@@ -88,9 +90,7 @@ export default function Fees() {
       loadAll()
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to add fee')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   const studentMap = {}
@@ -112,6 +112,9 @@ export default function Fees() {
     return student.full_name.toLowerCase().includes(search.toLowerCase()) ||
            student.roll_no.includes(search)
   })
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
@@ -136,7 +139,6 @@ export default function Fees() {
         </div>
       )}
 
-      {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
           <div key={status} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -151,7 +153,6 @@ export default function Fees() {
         ))}
       </div>
 
-      {/* Add fee form */}
       {showForm && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ fontWeight: 600, marginBottom: 14, color: 'var(--text)' }}>Add Fee Record</div>
@@ -189,12 +190,11 @@ export default function Fees() {
         </div>
       )}
 
-      {/* Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{filtered.length} records</span>
           <input className="input" placeholder="Search student..." style={{ width: 200 }}
-            value={search} onChange={e => setSearch(e.target.value)} />
+            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
         </div>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Loading...</div>
@@ -203,14 +203,15 @@ export default function Fees() {
             <thead>
               <tr>
                 <th>Roll No</th><th>Name</th><th>Fee Type</th>
-                <th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th>
+                <th>Amount</th><th>Date</th><th>Status</th><th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(f => {
+              {paginated.map(f => {
                 const student = studentMap[f.student_id]
                 const cfg = STATUS_CONFIG[f.status] || STATUS_CONFIG.pending
                 const isEditing = editId === f.id
+                const dateInfo = getDisplayDate(f)
                 return (
                   <tr key={f.id}>
                     <td style={{ fontFamily: 'monospace', color: 'var(--text2)' }}>{student?.roll_no || '—'}</td>
@@ -219,11 +220,15 @@ export default function Fees() {
                     <td style={{ fontWeight: 600 }}>NPR {f.amount.toLocaleString()}</td>
                     <td>
                       {isEditing ? (
-                        <input className="input" type="date" style={{ padding: '3px 6px', fontSize: 12, width: 140 }}
+                        <input className="input" type="date"
+                          style={{ padding: '3px 6px', fontSize: 12, width: 140 }}
                           value={editForm.due_date || ''}
                           onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} />
                       ) : (
-                        <span style={{ color: 'var(--text2)' }}>{f.due_date || '—'}</span>
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dateInfo.label}</div>
+                          <div style={{ fontSize: 12, color: dateInfo.color, fontWeight: 500 }}>{dateInfo.date}</div>
+                        </div>
                       )}
                     </td>
                     <td><span className={`badge ${cfg.badge}`}>{cfg.label}</span></td>
@@ -263,6 +268,33 @@ export default function Fees() {
           </table>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text2)' }}>
+            Page {page} of {totalPages} — {filtered.length} total records
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1} className="btn btn-ghost">
+              <ChevronLeft size={14} /> Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setPage(p)} className="btn"
+                style={{
+                  background: p === page ? 'var(--primary)' : 'transparent',
+                  color: p === page ? 'white' : 'var(--text2)',
+                  border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border)'}`,
+                  minWidth: 36,
+                }}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages} className="btn btn-ghost">
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

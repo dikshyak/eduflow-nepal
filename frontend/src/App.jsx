@@ -6,8 +6,10 @@ import Attendance from './pages/Attendance'
 import Marks from './pages/Marks'
 import Fees from './pages/Fees'
 import AIChat from './pages/AIChat'
+import Dashboard from './pages/Dashboard'
 
 const NAV = [
+  { id: 'dashboard',  label: 'Dashboard',  icon: BarChart3 },
   { id: 'students',   label: 'Students',   icon: Users },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { id: 'marks',      label: 'Marks',      icon: BarChart3 },
@@ -18,7 +20,7 @@ const NAV = [
 export default function App() {
   const [user,  setUser]  = useState(() => localStorage.getItem('access_token') ? {} : null)
   const [dark,  setDark]  = useState(false)
-  const [page,  setPage]  = useState('students')
+  const [page,  setPage]  = useState(() => localStorage.getItem('current_page') || 'students')
 
   const handleLogin  = (data) => setUser(data)
   const handleLogout = () => { localStorage.clear(); setUser(null) }
@@ -49,7 +51,7 @@ export default function App() {
 
         <nav style={{ flex: 1, padding: '0.75rem 0.75rem' }}>
           {NAV.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setPage(id)}
+            <button key={id} onClick={() => { setPage(id); localStorage.setItem('current_page', id) }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 width: '100%', padding: '9px 12px',
@@ -77,6 +79,7 @@ export default function App() {
 
       {/* Main content */}
       <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+        {page === 'dashboard'  && <Dashboard />}
         {page === 'students'   && <Students />}
         {page === 'attendance' && <Attendance />}
         {page === 'marks' && <Marks />}
