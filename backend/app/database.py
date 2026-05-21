@@ -3,14 +3,14 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 # SQLite doesn't support pool_size/max_overflow
-if settings.DATABASE_URL.startswith("sqlite"):
+if settings.async_database_url.startswith("sqlite"):
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        settings.async_database_url,
         echo=settings.DEBUG,
     )
 else:
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        settings.async_database_url,
         echo=settings.DEBUG,
         pool_size=10,
         max_overflow=20,
