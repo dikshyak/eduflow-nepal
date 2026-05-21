@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
+from datetime import date
 from app.database import get_db
 from app.models import Attendance, Student, User, AttendanceStatus
 from app.schemas import AttendanceCreate, AttendanceBulk, AttendanceResponse, AttendanceSummary
@@ -37,6 +38,9 @@ async def mark_bulk_attendance(
         )
         att = existing.scalar_one_or_none()
         if att:
+            att_date = date.fromisoformat(att.date)
+            if (date.today() - att_date).days >= 1:
+                raise HTTPException(400, f"Attendance for {att.date} is locked — cannot edit after 24 hours")
             att.status = record.status
             att.note = record.note
             results["updated"] += 1

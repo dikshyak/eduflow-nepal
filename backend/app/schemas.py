@@ -211,8 +211,13 @@ class FeeResponse(BaseModel):
 
 # ─── AI Chat ──────────────────────────────────────────────────────────────────
 
+class ChatMessage(BaseModel):
+    role: str  # 'user' or 'assistant'
+    content: str
+
 class ChatRequest(BaseModel):
     question: str
+    history: list[ChatMessage] = []
 
 
 class ChatResponse(BaseModel):

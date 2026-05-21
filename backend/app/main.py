@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import create_tables
 from app.websocket import ws_manager
-from app.routers import auth, students, attendance, marks, ai_chat, fees
+from app.routers import auth, students, attendance, marks, ai_chat, fees, classes
 from app.auth import get_current_user
 import logging
 
@@ -68,6 +68,7 @@ app.include_router(attendance.router)
 app.include_router(marks.router)
 app.include_router(ai_chat.router)
 app.include_router(fees.router)
+app.include_router(classes.router)
 
 
 # ─── WebSocket endpoint ───────────────────────────────────────────────────────

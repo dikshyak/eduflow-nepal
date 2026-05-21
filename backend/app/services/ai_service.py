@@ -12,16 +12,20 @@ users(id, school_id, email, role, full_name, is_active)
 classes(id, school_id, name, section)
 students(id, school_id, class_id, roll_no, full_name, email, phone,
          parent_name, parent_phone, gender, is_active)
-attendance(id, school_id, student_id, date TEXT 'YYYY-MM-DD',
+attendance(id, school_id, student_id, date TEXT stored as 'YYYY-MM-DD' string,
            status: 'present'|'absent'|'late')
+-- IMPORTANT: date column is TEXT, not DATE type. Use: date = '2026-05-21' format
+-- For today use: date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')
 exams(id, school_id, class_id, name, subject, exam_type, full_marks, pass_marks, date)
-marks(id, school_id, student_id, exam_id, marks, grade)
+marks(id, school_id, student_id, exam_id, marks FLOAT, grade TEXT)
+-- To check if passed: JOIN exams e ON marks.exam_id = e.id AND marks.marks >= e.pass_marks
+-- pass_marks is on exams table NOT on marks table
 fee_records(id, school_id, student_id, amount, fee_type, due_date,
             paid_date, status: 'pending'|'paid'|'overdue'|'waived')
 """
 
 
-async def question_to_sql(question: str, school_id: int) -> str:
+async def question_to_sql(question: str, school_id: int, history: list = []) -> str:
     # Guard against non-school questions
     school_keywords = ['student', 'attendance', 'fee', 'mark', 'exam', 'school',
                        'teacher', 'class', 'grade', 'present', 'absent', 'paid',
@@ -42,8 +46,12 @@ Rules:
 2. ALWAYS filter by school_id = {school_id} for data isolation.
 3. Use JOINs when student names are needed.
 4. Limit results to 50 rows unless asked for all.
-5. Never use DROP, DELETE, UPDATE, INSERT — read-only."""
+5. Never use DROP, DELETE, UPDATE, INSERT — read-only.
+6. pass_marks column is on exams table, NOT marks table. Always JOIN exams to check passing.
+7. attendance.date is TEXT type. For today use: date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD') NOT CURRENT_DATE.
+8. Text comparisons are case-sensitive. Use ILIKE instead of = for names and subjects."""
             },
+            *[{"role": m["role"], "content": m["content"]} for m in history],
             {
                 "role": "user",
                 "content": f"Convert to SQL: {question}"
@@ -66,7 +74,7 @@ Rules:
     return sql
 
 
-async def format_answer(question: str, rows: list, sql: str) -> str:
+async def format_answer(question: str, rows: list, sql: str, history: list = []) -> str:
     rows_preview = json.dumps(rows[:20], default=str)
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -75,6 +83,7 @@ async def format_answer(question: str, rows: list, sql: str) -> str:
                 "role": "system",
                 "content": "You are a helpful school assistant. Answer questions about school data clearly and concisely in 2-3 sentences."
             },
+            *[{"role": m["role"], "content": m["content"]} for m in history],
             {
                 "role": "user",
                 "content": f"""Question: {question}

@@ -14,7 +14,7 @@ const ALL_NAV = [
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck, roles: ['school_admin', 'super_admin', 'teacher'] },
   { id: 'marks',      label: 'Marks',      icon: BarChart3,    roles: ['school_admin', 'super_admin', 'teacher'] },
   { id: 'fees',       label: 'Fees',       icon: DollarSign,   roles: ['school_admin', 'super_admin'] },
-  { id: 'ai',         label: 'AI Chat',    icon: Bot,          roles: ['school_admin', 'super_admin'] },
+  { id: 'ai',         label: 'AI Chat',    icon: Bot,          roles: ['school_admin', 'super_admin', 'teacher'] },
 ]
 
 export default function App() {

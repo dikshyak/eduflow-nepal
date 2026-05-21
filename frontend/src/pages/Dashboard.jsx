@@ -10,23 +10,35 @@ export default function Dashboard() {
   const [fees,     setFees]     = useState([])
   const [exams,    setExams]    = useState([])
   const [lowAtt,   setLowAtt]   = useState([])
-  const [loading,  setLoading]  = useState(true)
+  const [loading,     setLoading]     = useState(true)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [myClass,     setMyClass]     = useState(null)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    loadAll()
+    const interval = setInterval(loadAll, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [stRes, feesRes, examsRes, lowRes] = await Promise.all([
+      const role = localStorage.getItem('user_role')
+      const adminRole = role === 'school_admin' || role === 'super_admin'
+      const promises = [
         api.getStudents({ page: 1, page_size: 100 }),
         api.getFees(),
         api.getExams(),
         api.getLowAttendance(),
-      ])
-      setStudents(stRes.data.items)
-      setFees(feesRes.data)
-      setExams(examsRes.data)
-      setLowAtt(lowRes.data)
+      ]
+      if (!adminRole) promises.push(api.getClasses())
+      const results = await Promise.all(promises)
+      setStudents(results[0].data.items)
+      setFees(results[1].data)
+      setExams(results[2].data)
+      setLowAtt(results[3].data)
+      if (!adminRole && results[4]) setMyClass(results[4].data[0] || null)
+      setLastUpdated(new Date().toLocaleTimeString())
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -61,6 +73,8 @@ export default function Dashboard() {
     pct: s.percentage,
   }))
 
+  const showAttBar = attBarData.length > 0
+
   const today = new Date().toLocaleDateString('en-NP', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
   if (loading) return (
@@ -74,7 +88,9 @@ export default function Dashboard() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Dashboard</h1>
-        <p style={{ color: 'var(--text3)', fontSize: 12, marginTop: 2 }}>{today}</p>
+        <p style={{ color: 'var(--text3)', fontSize: 12, marginTop: 2 }}>
+          {today} {lastUpdated && `· Last updated ${lastUpdated}`}
+        </p>
       </div>
 
       {/* Top KPI cards */}
@@ -132,8 +148,14 @@ export default function Dashboard() {
             <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14, marginBottom: 16 }}>My Classes</p>
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text3)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
-              <div>Grade 10 — Section A</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>Ram Prasad Sharma</div>
+              {myClass ? (
+                <>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{myClass.name} — Section {myClass.section}</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>{totalStudents} students enrolled</div>
+                </>
+              ) : (
+                <div>No class assigned</div>
+              )}
             </div>
           </div>
         )}
@@ -146,10 +168,13 @@ export default function Dashboard() {
               below 75%
             </span>
           </div>
-          {attBarData.length === 0 ? (
-            <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', gap: 8 }}>
-              <CheckCircle size={32} color="#22c55e" />
-              <span style={{ fontSize: 13 }}>All students above 75% attendance</span>
+          {!showAttBar ? (
+            <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <CheckCircle size={36} color="#22c55e" />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#22c55e' }}>Excellent!</div>
+                <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 4 }}>All {totalStudents} students above 75% attendance</div>
+              </div>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
@@ -190,7 +215,7 @@ export default function Dashboard() {
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span className="badge badge-blue">{e.exam_type.replace('_', ' ')}</span>
-                <span style={{ fontSize: 12, color: 'var(--text2)' }}>{e.full_marks}m</span>
+                <span style={{ fontSize: 12, color: 'var(--text2)' }}>{e.full_marks} marks</span>
               </div>
             </div>
           ))}

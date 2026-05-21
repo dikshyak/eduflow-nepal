@@ -34,7 +34,11 @@ export default function AIChat() {
     setInput('')
     setLoading(true)
     try {
-      const res = await api.askAI(q)
+      const chatHistory = messages.map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.text,
+      }))
+      const res = await api.askAI(q, chatHistory)
       setMessages(m => [...m, {
         role: 'ai',
         text: res.data.answer,
