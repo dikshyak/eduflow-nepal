@@ -22,6 +22,13 @@ fee_records(id, school_id, student_id, amount, fee_type, due_date,
 
 
 async def question_to_sql(question: str, school_id: int) -> str:
+    # Guard against non-school questions
+    school_keywords = ['student', 'attendance', 'fee', 'mark', 'exam', 'school',
+                       'teacher', 'class', 'grade', 'present', 'absent', 'paid',
+                       'pending', 'overdue', 'roll', 'score', 'rank', 'subject']
+    if not any(kw in question.lower() for kw in school_keywords):
+        raise ValueError("Please ask questions about school data — students, attendance, marks, or fees.")
+
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[

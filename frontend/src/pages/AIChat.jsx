@@ -42,9 +42,10 @@ export default function AIChat() {
         count: res.data.row_count,
       }])
     } catch (e) {
+      const detail = e.response?.data?.detail
       setMessages(m => [...m, {
         role: 'ai',
-        text: e.response?.data?.error || 'Sorry, something went wrong. Please try again.',
+        text: detail || 'Sorry, something went wrong. Please try again.',
         sql: null,
       }])
     } finally {
