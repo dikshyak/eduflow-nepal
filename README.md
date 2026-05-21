@@ -6,7 +6,21 @@ A production-grade, multi-tenant school management platform built for Nepal's ed
 
 ---
 
-## Local URLs
+## 🌐 Live Demo
+
+| Service | URL |
+|---------|-----|
+| **Live Site** | https://eduflow.dikshyak.com.np |
+| **Vercel** | https://eduflow-nepal.vercel.app |
+| **Backend API** | https://eduflow-backend-bwnc.onrender.com |
+| **API Docs (Swagger)** | https://eduflow-backend-bwnc.onrender.com/docs |
+| **GitHub** | https://github.com/dikshyak/eduflow-nepal |
+
+> Note: Backend is hosted on Render free tier. First request may take 50 seconds to wake up.
+
+---
+
+## 🖥️ Local URLs
 
 | Service | URL | Notes |
 |---------|-----|-------|
@@ -17,7 +31,7 @@ A production-grade, multi-tenant school management platform built for Nepal's ed
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -29,18 +43,19 @@ A production-grade, multi-tenant school management platform built for Nepal's ed
 | AI | Groq API — llama-3.3-70b (natural language to SQL, conversation memory) |
 | Real-time | FastAPI WebSockets, 30s auto-refresh dashboard |
 | DevOps | Docker, Docker Compose, GitHub Actions CI/CD |
+| Hosting | Render (backend) + Vercel (frontend) + Cloudflare (domain) |
 
 ---
 
-## Features
+## ✨ Features
 
 ### Admin Role
-- **Dashboard** — KPI cards (students, fee collected, overdue, at-risk), fee donut chart, attendance bar chart, at-risk students with progress bars. Auto-refreshes every 30 seconds with last updated timestamp.
-- **Students** — pagination, search, add, delete. Click any student name to open slide-out profile drawer showing attendance summary, marks with subject names, and fee records.
-- **Attendance** — two tabs: Mark Attendance (bulk mark all students present/absent/late) and Student History (monthly calendar showing green/red/orange days per student, navigate months, monthly stats)
+- **Dashboard** — KPI cards (students, fee collected, overdue, at-risk), fee donut chart, attendance bar chart, at-risk students with progress bars. Auto-refreshes every 30 seconds.
+- **Students** — pagination, search, add, delete. Click any student name to open slide-out profile drawer showing attendance summary, marks, and fee records.
+- **Attendance** — two tabs: Mark Attendance (bulk mark all students present/absent/late) and Student History (monthly calendar showing green/red/orange days, navigate months, monthly stats)
 - **Marks & Exams** — create exams, enter results per student, auto-grade (A+ to F), class rankings with gold/silver/bronze for top 3, edit marks inline
-- **Fee Management** — grouped by student, shows billed/paid/balance per student, multiple fee types (tuition/exam/library/sports/transport), expand to see individual records, mark paid/overdue/waived, searchable student dropdown
-- **AI Chat** — ask in plain English, AI generates SQL and answers from real data, conversation memory (remembers context), rejects non-school questions
+- **Fee Management** — grouped by student, shows billed/paid/balance, multiple fee types (tuition/exam/library/sports/transport), mark paid/overdue/waived
+- **AI Chat** — ask in plain English, AI generates SQL and answers from real data, conversation memory, rejects non-school questions
 - **Dark / Light mode** toggle
 - **Role-based access** — admin sees everything including fees and AI
 
@@ -49,11 +64,11 @@ A production-grade, multi-tenant school management platform built for Nepal's ed
 - **Students** — view students, click to see profile drawer
 - **Attendance** — mark attendance + view student history calendar
 - **Marks** — view rankings, enter marks for students
-- **AI Chat** — ask about students, attendance, marks (no fee queries)
+- **AI Chat** — ask about students, attendance, marks
 
 ---
 
-## Demo Credentials
+## 🔑 Demo Credentials
 
 | Role | Email | Password | Access |
 |------|-------|----------|--------|
@@ -62,21 +77,21 @@ A production-grade, multi-tenant school management platform built for Nepal's ed
 
 ---
 
-## Architecture Decisions
+## 🏗️ Architecture Decisions
 
-**Multi-tenant via shared DB** — Single PostgreSQL database with `school_id` on every table. Simpler than per-school databases. All queries filtered at the ORM layer — a missing filter would leak data, so it's enforced in every router.
+**Multi-tenant via shared DB** — Single PostgreSQL database with `school_id` on every table. All queries filtered at the ORM layer to prevent data leakage between schools.
 
-**Celery + Redis over FastAPI BackgroundTasks** — Celery runs in a separate worker with retry logic and scheduled tasks (weekly fee reminders, monthly reports). FastAPI BackgroundTasks die with the request process.
+**Celery + Redis over FastAPI BackgroundTasks** — Celery runs in a separate worker with retry logic and scheduled tasks (weekly fee reminders, monthly reports). BackgroundTasks die with the request process.
 
-**Access + refresh token pair** — Short-lived access tokens (60 min) limit stolen token damage. Refresh tokens (7 days) allow seamless re-auth without re-login. Standard production practice.
+**Access + refresh token pair** — Short-lived access tokens (60 min) limit stolen token damage. Refresh tokens (7 days) allow seamless re-auth without re-login.
 
 **Groq over Gemini** — Groq's free tier is faster and more reliable. The AI service generates school-scoped read-only SQL from natural language with conversation history for context.
 
-**AI safety** — AI only runs SELECT queries (never INSERT/UPDATE/DELETE), always filters by school_id, rejects non-school questions, and uses ILIKE for case-insensitive matching.
+**AI safety** — AI only runs SELECT queries (never INSERT/UPDATE/DELETE), always filters by school_id, rejects non-school questions, uses ILIKE for case-insensitive matching.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Option 1 — Docker (recommended)
 ```bash
@@ -105,7 +120,7 @@ Open http://localhost:5173
 
 ---
 
-## Running Tests
+## 🧪 Running Tests
 
 ```bash
 cd backend
@@ -116,7 +131,7 @@ pytest tests/ -v
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 eduflow-nepal/
@@ -128,7 +143,7 @@ eduflow-nepal/
 │   │   ├── models.py            ← SQLAlchemy ORM (schools, users, classes, students,
 │   │   │                            attendance, exams, marks, fee_records)
 │   │   ├── schemas.py           ← Pydantic request/response schemas
-│   │   ├── auth.py              ← JWT tokens + bcrypt + role guards (require_admin, require_teacher)
+│   │   ├── auth.py              ← JWT tokens + bcrypt + role guards
 │   │   ├── config.py            ← settings from .env
 │   │   ├── database.py          ← async PostgreSQL engine (SQLite for tests)
 │   │   ├── websocket.py         ← WebSocket connection manager
@@ -170,14 +185,16 @@ eduflow-nepal/
 ├── docker-compose.yml           ← 5 services: frontend, backend, db, redis, celery
 ├── .env.example
 └── README.md
+
 ```
 
 ---
 
-## Known Limitations & Future Work
+## ⚠️ Known Limitations & Future Work
 
 - No SMS/email delivery yet (fee reminders log to console — integrate Sparrow SMS for Nepal)
 - No file uploads for student documents or photos
 - No parent/student portal (admin and teacher roles only)
 - Attendance locked after 24 hours (cannot edit past records)
 - WebSocket auth uses query param token — move to header cookie in production
+- Backend hosted on Render free tier — first request may be slow (50s spin-up time)
