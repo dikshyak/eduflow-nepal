@@ -84,19 +84,3 @@ async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)
         user_role=user.role.value,
         school_id=user.school_id,
     )
-
-@router.post("/mark-atrisk", include_in_schema=False)
-async def mark_atrisk(db: AsyncSession = Depends(get_db)):
-    from app.models import Attendance, AttendanceStatus, Student
-    from sqlalchemy import update
-    from datetime import date
-    students = (await db.execute(select(Student).limit(3))).scalars().all()
-    today = date.today()
-    for s in students:
-        await db.execute(
-            update(Attendance)
-            .where(Attendance.student_id == s.id, Attendance.date != today.isoformat())
-            .values(status=AttendanceStatus.absent)
-        )
-    await db.commit()
-    return {"message": "Done", "students": [s.full_name for s in students]}
