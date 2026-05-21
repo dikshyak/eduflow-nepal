@@ -31,6 +31,9 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }
 
+  const userRole = localStorage.getItem('user_role')
+  const isAdmin  = userRole === 'school_admin' || userRole === 'super_admin'
+
   const totalStudents  = students.length
   const feeCollected   = fees.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0)
   const feeTotal       = fees.filter(f => f.status !== 'waived').reduce((s, f) => s + f.amount, 0)
@@ -38,6 +41,13 @@ export default function Dashboard() {
   const feeOverdue     = fees.filter(f => f.status === 'overdue').length
   const atRisk         = lowAtt.filter(s => s.percentage < 75).length
   const collectionRate = feeTotal > 0 ? Math.round((feeCollected / feeTotal) * 100) : 0
+
+  const kpiCards = [
+    { label: 'Total Students', value: totalStudents,                    icon: Users,         color: '#3b82f6',                              bg: '#dbeafe',                             show: true },
+    { label: 'Fee Collected',  value: `NPR ${feeCollected.toLocaleString()}`, icon: DollarSign, color: '#22c55e',                           bg: '#dcfce7',                             show: isAdmin },
+    { label: 'Fee Overdue',    value: feeOverdue,                       icon: Clock,         color: feeOverdue > 0 ? '#ef4444' : 'var(--text3)', bg: feeOverdue > 0 ? '#fee2e2' : 'var(--bg3)', show: isAdmin },
+    { label: 'At Risk',        value: atRisk,                           icon: AlertTriangle, color: atRisk > 0 ? '#ef4444' : '#22c55e',    bg: atRisk > 0 ? '#fee2e2' : '#dcfce7',   show: true },
+  ].filter(c => c.show)
 
   const feePieData = [
     { name: 'Paid',    value: fees.filter(f => f.status === 'paid').length },
@@ -68,97 +78,65 @@ export default function Dashboard() {
       </div>
 
       {/* Top KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-
-        <div className="card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', border: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Total Students</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'white', lineHeight: 1 }}>{totalStudents}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>enrolled this year</div>
-            </div>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Users size={20} color="white" />
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Fee Collected</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#22c55e', lineHeight: 1 }}>NPR {(feeCollected/1000).toFixed(1)}k</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>{collectionRate}% of total billed</div>
-            </div>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <DollarSign size={20} color="#22c55e" />
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kpiCards.length}, 1fr)`, gap: 12, marginBottom: 20 }}>
+        {kpiCards.map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>{label}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+              </div>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={20} color={color} />
+              </div>
             </div>
           </div>
-          <div style={{ height: 4, borderRadius: 2, background: 'var(--bg3)', marginTop: 12, overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 2, width: `${collectionRate}%`, background: '#22c55e', transition: 'width 0.5s' }} />
-          </div>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Fee Overdue</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: feeOverdue > 0 ? '#ef4444' : 'var(--text)', lineHeight: 1 }}>{feeOverdue}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>{feePending - feeOverdue} pending + {feeOverdue} overdue</div>
-            </div>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: feeOverdue > 0 ? '#fee2e2' : 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={20} color={feeOverdue > 0 ? '#ef4444' : 'var(--text3)'} />
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>At Risk</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: atRisk > 0 ? '#ef4444' : '#22c55e', lineHeight: 1 }}>{atRisk}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>below 75% attendance</div>
-            </div>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: atRisk > 0 ? '#fee2e2' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertTriangle size={20} color={atRisk > 0 ? '#ef4444' : '#22c55e'} />
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Charts row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
 
-        {/* Fee pie */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>Fee Status</p>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>{fees.length} total records</span>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={feePieData} cx="40%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={3}>
-                {feePieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 12, color: 'var(--text2)' }}>{v}</span>} />
-              <Tooltip formatter={(v, n) => {
-                const amount = fees.filter(f => f.status === n.toLowerCase()).reduce((s, f) => s + f.amount, 0)
-                return [`${v} records — NPR ${amount.toLocaleString()}`, n]
-              }} />
-            </PieChart>
-          </ResponsiveContainer>
-          {/* Fee summary below chart */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-            <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: '#dcfce7', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>NPR {feeCollected.toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: '#166534' }}>COLLECTED</div>
+        {/* Fee pie — admin only */}
+        {isAdmin ? (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>Fee Status</p>
+              <span style={{ fontSize: 11, color: 'var(--text3)' }}>{fees.length} total records</span>
             </div>
-            <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: '#fee2e2', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>NPR {(feeTotal - feeCollected).toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: '#991b1b' }}>REMAINING</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={feePieData} cx="40%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={3}>
+                  {feePieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 12, color: 'var(--text2)' }}>{v}</span>} />
+                <Tooltip formatter={(v, n) => {
+                  const amount = fees.filter(f => f.status === n.toLowerCase()).reduce((s, f) => s + f.amount, 0)
+                  return [`${v} records — NPR ${amount.toLocaleString()}`, n]
+                }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: '#dcfce7', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>NPR {feeCollected.toLocaleString()}</div>
+                <div style={{ fontSize: 10, color: '#166534' }}>COLLECTED</div>
+              </div>
+              <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, background: '#fee2e2', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>NPR {(feeTotal - feeCollected).toLocaleString()}</div>
+                <div style={{ fontSize: 10, color: '#991b1b' }}>REMAINING</div>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="card">
+            <p style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14, marginBottom: 16 }}>My Classes</p>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text3)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
+              <div>Grade 10 — Section A</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Ram Prasad Sharma</div>
+            </div>
+          </div>
+        )}
 
         {/* Attendance bar */}
         <div className="card">

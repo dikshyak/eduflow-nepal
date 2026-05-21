@@ -144,9 +144,17 @@ export default function Login({ onLogin, dark, toggleDark }) {
           background: 'var(--bg3)', borderRadius: 8,
           fontSize: 12, color: 'var(--text2)',
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Demo credentials</div>
-          <div>Email: admin@kms.edu.np</div>
-          <div>Password: Admin@1234</div>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Demo credentials</div>
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>🔑 Admin</div>
+            <div>Email: admin@kms.edu.np</div>
+            <div>Password: Admin@1234</div>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+            <div style={{ fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>👨‍🏫 Teacher</div>
+            <div>Email: teacher@kms.edu.np</div>
+            <div>Password: Teacher@1234</div>
+          </div>
         </div>
       </div>
     </div>

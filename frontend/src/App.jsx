@@ -8,21 +8,25 @@ import Fees from './pages/Fees'
 import AIChat from './pages/AIChat'
 import Dashboard from './pages/Dashboard'
 
-const NAV = [
-  { id: 'dashboard',  label: 'Dashboard',  icon: BarChart3 },
-  { id: 'students',   label: 'Students',   icon: Users },
-  { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
-  { id: 'marks',      label: 'Marks',      icon: BarChart3 },
-  { id: 'fees',       label: 'Fees',       icon: DollarSign },
-  { id: 'ai',         label: 'AI Chat',    icon: Bot },
+const ALL_NAV = [
+  { id: 'dashboard',  label: 'Dashboard',  icon: BarChart3,    roles: ['school_admin', 'super_admin', 'teacher'] },
+  { id: 'students',   label: 'Students',   icon: Users,        roles: ['school_admin', 'super_admin', 'teacher'] },
+  { id: 'attendance', label: 'Attendance', icon: CalendarCheck, roles: ['school_admin', 'super_admin', 'teacher'] },
+  { id: 'marks',      label: 'Marks',      icon: BarChart3,    roles: ['school_admin', 'super_admin', 'teacher'] },
+  { id: 'fees',       label: 'Fees',       icon: DollarSign,   roles: ['school_admin', 'super_admin'] },
+  { id: 'ai',         label: 'AI Chat',    icon: Bot,          roles: ['school_admin', 'super_admin'] },
 ]
 
 export default function App() {
-  const [user,  setUser]  = useState(() => localStorage.getItem('access_token') ? {} : null)
+  const [user,  setUser]  = useState(() => {
+    const token = localStorage.getItem('access_token')
+    const role = localStorage.getItem('user_role')
+    return token ? { role } : null
+  })
   const [dark,  setDark]  = useState(false)
   const [page,  setPage]  = useState(() => localStorage.getItem('current_page') || 'students')
 
-  const handleLogin  = (data) => setUser(data)
+  const handleLogin  = (data) => { setUser({ role: data.user_role }) }
   const handleLogout = () => { localStorage.clear(); setUser(null) }
   const toggleDark   = () => {
     setDark(d => {
@@ -30,6 +34,8 @@ export default function App() {
       return !d
     })
   }
+
+  const NAV = ALL_NAV.filter(n => n.roles.includes(user?.role))
 
   if (!user) return <Login onLogin={handleLogin} dark={dark} toggleDark={toggleDark} />
 
