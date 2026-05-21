@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, CheckCircle, Clock, AlertCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { RefreshCw, CheckCircle, Clock, AlertCircle, Plus, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react'
 import { api } from '../api'
+
+const FEE_TYPES = ['tuition', 'exam', 'library', 'sports', 'transport']
 
 const STATUS_CONFIG = {
   paid:    { label: 'Paid',    color: '#22c55e', bg: '#dcfce7', badge: 'badge-green', icon: CheckCircle },
@@ -9,28 +11,19 @@ const STATUS_CONFIG = {
   waived:  { label: 'Waived',  color: '#94a3b8', bg: '#f1f5f9', badge: 'badge-gray',  icon: CheckCircle },
 }
 
-function getDisplayDate(f) {
-  if (f.status === 'paid')    return { date: f.paid_date || f.due_date || '—', label: 'Paid on',  color: '#22c55e' }
-  if (f.status === 'overdue') return { date: f.due_date || '—',                label: 'Was due',  color: '#ef4444' }
-  if (f.status === 'pending') return { date: f.due_date || '—',                label: 'Due by',   color: '#f59e0b' }
-  return { date: '—', label: '', color: 'var(--text2)' }
-}
-
-const PAGE_SIZE = 20
-
 export default function Fees() {
   const [fees,      setFees]      = useState([])
   const [students,  setStudents]  = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
   const [search,    setSearch]    = useState('')
-  const [page,      setPage]      = useState(1)
   const [showForm,  setShowForm]  = useState(false)
   const [saving,    setSaving]    = useState(false)
-  const [editId,    setEditId]    = useState(null)
-  const [editForm,  setEditForm]  = useState({})
+  const [expanded,    setExpanded]    = useState({})
+  const [editingFee,  setEditingFee]  = useState(null)
+  const [statusFilter, setStatusFilter] = useState(null)
   const [form,      setForm]      = useState({
-    student_id: '', amount: '3500', fee_type: 'tuition', due_date: ''
+    student_id: '', studentSearch: '', amount: '3500', fee_type: 'tuition', due_date: ''
   })
 
   useEffect(() => { loadAll() }, [])
@@ -42,8 +35,16 @@ export default function Fees() {
         api.getFees(),
         api.getStudents({ page: 1, page_size: 100 })
       ])
-      setFees(feesRes.data)
-      setStudents(stRes.data.items)
+      const studentList = stRes.data.items
+      const lookup = {}
+      studentList.forEach(s => lookup[s.id] = s)
+      const sorted = [...feesRes.data].sort((a, b) => {
+        const ra = lookup[a.student_id]?.roll_no || '999'
+        const rb = lookup[b.student_id]?.roll_no || '999'
+        return ra.localeCompare(rb, undefined, { numeric: true })
+      })
+      setStudents(studentList)
+      setFees(sorted)
     } catch {
       setError('Failed to load fees')
     } finally {
@@ -54,24 +55,16 @@ export default function Fees() {
   const handleMarkPaid = async (feeId) => {
     try {
       const today = new Date().toISOString().split('T')[0]
-      await api.updateFee(feeId, { status: 'paid', paid_date: today })
-      loadAll()
+      const updated = await api.updateFee(feeId, { status: 'paid', paid_date: today })
+      setFees(prev => prev.map(f => f.id === feeId ? updated.data : f))
     } catch { setError('Failed to update fee') }
   }
 
   const handleUpdateStatus = async (feeId, status) => {
     try {
-      await api.updateFee(feeId, { status })
-      loadAll()
+      const updated = await api.updateFee(feeId, { status })
+      setFees(prev => prev.map(f => f.id === feeId ? updated.data : f))
     } catch { setError('Failed to update fee') }
-  }
-
-  const handleSaveEdit = async () => {
-    try {
-      await api.updateFee(editId, { due_date: editForm.due_date || null })
-      setEditId(null)
-      loadAll()
-    } catch { setError('Failed to save changes') }
   }
 
   const handleAddFee = async () => {
@@ -85,7 +78,7 @@ export default function Fees() {
         fee_type: form.fee_type,
         due_date: form.due_date || null,
       })
-      setForm({ student_id: '', amount: '3500', fee_type: 'tuition', due_date: '' })
+      setForm({ student_id: '', studentSearch: '', amount: '3500', fee_type: 'tuition', due_date: '' })
       setShowForm(false)
       loadAll()
     } catch (e) {
@@ -96,33 +89,35 @@ export default function Fees() {
   const studentMap = {}
   students.forEach(s => studentMap[s.id] = s)
 
-  const counts = {
-    paid:    fees.filter(f => f.status === 'paid').length,
-    pending: fees.filter(f => f.status === 'pending').length,
-    overdue: fees.filter(f => f.status === 'overdue').length,
-    waived:  fees.filter(f => f.status === 'waived').length,
-  }
+  const grouped = {}
+  fees.forEach(f => {
+    if (!grouped[f.student_id]) grouped[f.student_id] = []
+    grouped[f.student_id].push(f)
+  })
 
   const totalCollected = fees.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0)
   const totalPending   = fees.filter(f => f.status !== 'paid' && f.status !== 'waived').reduce((s, f) => s + f.amount, 0)
+  const totalOwed      = fees.filter(f => f.status !== 'waived').reduce((s, f) => s + f.amount, 0)
+  const collectionRate = totalOwed > 0 ? Math.round((totalCollected / totalOwed) * 100) : 0
 
-  const filtered = fees.filter(f => {
-    const student = studentMap[f.student_id]
-    if (!student) return true
-    return student.full_name.toLowerCase().includes(search.toLowerCase()) ||
-           student.roll_no.includes(search)
+  const statusCounts = { paid: 0, pending: 0, overdue: 0, waived: 0 }
+  fees.forEach(f => { if (statusCounts[f.status] !== undefined) statusCounts[f.status]++ })
+
+  const filteredStudents = students.filter(s => {
+    if (!grouped[s.id]) return false
+    const matchesSearch = s.full_name.toLowerCase().includes(search.toLowerCase()) || s.roll_no.includes(search)
+    const matchesStatus = !statusFilter || (grouped[s.id] || []).some(f => f.status === statusFilter)
+    return matchesSearch && matchesStatus
   })
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Fees</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Fee Management</h1>
           <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 2 }}>
-            Collected: NPR {totalCollected.toLocaleString()} &nbsp;|&nbsp; Pending: NPR {totalPending.toLocaleString()}
+            Track and manage student fee payments
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -139,30 +134,69 @@ export default function Fees() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
-          <div key={status} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <cfg.icon size={18} color={cfg.color} />
-            </div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{counts[status]}</div>
-              <div style={{ fontSize: 12, color: 'var(--text2)' }}>{cfg.label}</div>
-            </div>
+      {/* Top stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <div className="card" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Total Collected</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>NPR {totalCollected.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{collectionRate}% collection rate</div>
+        </div>
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Remaining</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>NPR {totalPending.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>yet to collect</div>
+        </div>
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Total Billed</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>NPR {totalOwed.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{fees.filter(f=>f.status!=='waived').length} active records</div>
+        </div>
+        <div className="card">
+          <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Collection Rate</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: collectionRate >= 75 ? '#22c55e' : '#ef4444' }}>{collectionRate}%</div>
+          <div style={{ height: 6, borderRadius: 3, background: 'var(--bg3)', marginTop: 8, overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 3, width: `${collectionRate}%`, background: collectionRate >= 75 ? '#22c55e' : '#ef4444', transition: 'width 0.5s' }} />
           </div>
-        ))}
+        </div>
       </div>
 
+      {/* Add fee form */}
       {showForm && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ fontWeight: 600, marginBottom: 14, color: 'var(--text)' }}>Add Fee Record</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Student *</label>
-              <select className="input" value={form.student_id} onChange={e => setForm({ ...form, student_id: e.target.value })}>
-                <option value="">Select student</option>
-                {students.map(s => <option key={s.id} value={s.id}>{s.roll_no} — {s.full_name}</option>)}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <input className="input" placeholder="Search student..."
+                  value={form.studentSearch}
+                  onChange={e => setForm({ ...form, studentSearch: e.target.value, student_id: '' })} />
+                {form.studentSearch && !form.student_id && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0,
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, zIndex: 50, maxHeight: 200, overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}>
+                    {students.filter(s =>
+                      s.full_name.toLowerCase().includes(form.studentSearch.toLowerCase()) ||
+                      s.roll_no.includes(form.studentSearch)
+                    ).map(s => (
+                      <div key={s.id}
+                        onClick={() => setForm({ ...form, student_id: String(s.id), studentSearch: `${s.roll_no} — ${s.full_name}` })}
+                        style={{
+                          padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                          color: 'var(--text)', borderBottom: '1px solid var(--border)',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--text3)', marginRight: 8 }}>{s.roll_no}</span>
+                        {s.full_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Amount (NPR) *</label>
@@ -171,11 +205,7 @@ export default function Fees() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text2)', display: 'block', marginBottom: 4 }}>Fee type</label>
               <select className="input" value={form.fee_type} onChange={e => setForm({ ...form, fee_type: e.target.value })}>
-                <option value="tuition">Tuition</option>
-                <option value="exam">Exam</option>
-                <option value="library">Library</option>
-                <option value="sports">Sports</option>
-                <option value="transport">Transport</option>
+                {FEE_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
               </select>
             </div>
             <div>
@@ -190,111 +220,218 @@ export default function Fees() {
         </div>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{filtered.length} records</span>
-          <input className="input" placeholder="Search student..." style={{ width: 200 }}
-            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
-        </div>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Loading...</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Roll No</th><th>Name</th><th>Fee Type</th>
-                <th>Amount</th><th>Date</th><th>Status</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map(f => {
-                const student = studentMap[f.student_id]
-                const cfg = STATUS_CONFIG[f.status] || STATUS_CONFIG.pending
-                const isEditing = editId === f.id
-                const dateInfo = getDisplayDate(f)
-                return (
-                  <tr key={f.id}>
-                    <td style={{ fontFamily: 'monospace', color: 'var(--text2)' }}>{student?.roll_no || '—'}</td>
-                    <td style={{ fontWeight: 500 }}>{student?.full_name || '—'}</td>
-                    <td><span className="badge badge-blue">{f.fee_type}</span></td>
-                    <td style={{ fontWeight: 600 }}>NPR {f.amount.toLocaleString()}</td>
-                    <td>
-                      {isEditing ? (
-                        <input className="input" type="date"
-                          style={{ padding: '3px 6px', fontSize: 12, width: 140 }}
-                          value={editForm.due_date || ''}
-                          onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} />
-                      ) : (
-                        <div>
-                          <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dateInfo.label}</div>
-                          <div style={{ fontSize: 12, color: dateInfo.color, fontWeight: 500 }}>{dateInfo.date}</div>
-                        </div>
-                      )}
-                    </td>
-                    <td><span className={`badge ${cfg.badge}`}>{cfg.label}</span></td>
-                    <td>
-                      {isEditing ? (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={handleSaveEdit} className="btn btn-primary" style={{ fontSize: 11, padding: '3px 8px' }}>Save</button>
-                          <button onClick={() => setEditId(null)} className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>Cancel</button>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <button onClick={() => { setEditId(f.id); setEditForm({ due_date: f.due_date || '' }) }}
-                            className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>Edit</button>
-                          {f.status !== 'paid' && f.status !== 'waived' && (
-                            <button onClick={() => handleMarkPaid(f.id)} className="btn btn-ghost"
-                              style={{ fontSize: 11, padding: '3px 8px', color: '#22c55e', borderColor: '#22c55e' }}>Paid</button>
-                          )}
-                          {f.status !== 'overdue' && f.status !== 'paid' && f.status !== 'waived' && (
-                            <button onClick={() => handleUpdateStatus(f.id, 'overdue')} className="btn btn-ghost"
-                              style={{ fontSize: 11, padding: '3px 8px', color: '#ef4444', borderColor: '#ef4444' }}>Overdue</button>
-                          )}
-                          {f.status !== 'waived' && f.status !== 'paid' && (
-                            <button onClick={() => handleUpdateStatus(f.id, 'waived')} className="btn btn-ghost"
-                              style={{ fontSize: 11, padding: '3px 8px', color: '#94a3b8', borderColor: '#94a3b8' }}>Waive</button>
-                          )}
-                          {(f.status === 'paid' || f.status === 'waived' || f.status === 'overdue') && (
-                            <button onClick={() => handleUpdateStatus(f.id, 'pending')} className="btn btn-ghost"
-                              style={{ fontSize: 11, padding: '3px 8px', color: '#f59e0b', borderColor: '#f59e0b' }}>Reset</button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
+      {/* Status filter pills */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {[
+          { key: null,      label: 'All',     color: 'var(--text2)',  bg: 'var(--bg3)',  count: fees.length },
+          { key: 'paid',    label: 'Paid',    color: '#16a34a',       bg: '#dcfce7',     count: statusCounts.paid },
+          { key: 'pending', label: 'Pending', color: '#b45309',       bg: '#fef3c7',     count: statusCounts.pending },
+          { key: 'overdue', label: 'Overdue', color: '#dc2626',       bg: '#fee2e2',     count: statusCounts.overdue },
+          { key: 'waived',  label: 'Waived',  color: '#64748b',       bg: '#f1f5f9',     count: statusCounts.waived },
+        ].map(({ key, label, color, bg, count }) => {
+          const active = statusFilter === key
+          return (
+            <button key={String(key)} onClick={() => setStatusFilter(key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: active ? 700 : 500,
+                background: active ? bg : 'var(--bg3)',
+                color: active ? color : 'var(--text2)',
+                outline: active ? `2px solid ${color}` : 'none',
+                outlineOffset: 1,
+                transition: 'all 0.15s',
+              }}>
+              {label}
+              <span style={{
+                fontSize: 11, fontWeight: 700,
+                background: active ? color : 'var(--bg)',
+                color: active ? '#fff' : 'var(--text3)',
+                borderRadius: 20, padding: '1px 7px',
+              }}>{count}</span>
+            </button>
+          )
+        })}
       </div>
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
-          <p style={{ fontSize: 13, color: 'var(--text2)' }}>
-            Page {page} of {totalPages} — {filtered.length} total records
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1} className="btn btn-ghost">
-              <ChevronLeft size={14} /> Prev
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button key={p} onClick={() => setPage(p)} className="btn"
-                style={{
-                  background: p === page ? 'var(--primary)' : 'transparent',
-                  color: p === page ? 'white' : 'var(--text2)',
-                  border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border)'}`,
-                  minWidth: 36,
-                }}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page===totalPages} className="btn btn-ghost">
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Search */}
+      <div style={{ marginBottom: 12 }}>
+        <input className="input" placeholder="Search by name or roll no..."
+          style={{ maxWidth: 300 }}
+          value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Student rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading ? (
+          <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text3)' }}>Loading...</div>
+        ) : filteredStudents.map(s => {
+          const studentFees = grouped[s.id] || []
+          const totalOwedS  = studentFees.filter(f => f.status !== 'waived').reduce((sum, f) => sum + f.amount, 0)
+          const totalPaidS  = studentFees.filter(f => f.status === 'paid').reduce((sum, f) => sum + f.amount, 0)
+          const balance     = totalOwedS - totalPaidS
+          const isExpanded  = expanded[s.id]
+          const hasOverdue  = studentFees.some(f => f.status === 'overdue')
+          const allClear    = balance === 0
+
+          return (
+            <div key={s.id} className="card" style={{
+              padding: 0, overflow: 'hidden',
+              border: hasOverdue ? '1px solid #fca5a5' : allClear ? '1px solid #86efac' : '1px solid var(--border)',
+            }}>
+              {/* Main row */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', gap: 12 }}>
+                {/* Status indicator */}
+                <div style={{
+                  width: 4, height: 40, borderRadius: 2, flexShrink: 0,
+                  background: allClear ? '#22c55e' : hasOverdue ? '#ef4444' : '#f59e0b',
+                }} />
+
+                {/* Student info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{s.full_name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Roll {s.roll_no}</div>
+                </div>
+
+                {/* Fee breakdown */}
+                <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>BILLED</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>NPR {totalOwedS.toLocaleString()}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>PAID</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#22c55e' }}>NPR {totalPaidS.toLocaleString()}</div>
+                  </div>
+                  <div style={{ textAlign: 'center', minWidth: 100 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>BALANCE</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: allClear ? '#22c55e' : hasOverdue ? '#ef4444' : '#f59e0b' }}>
+                      {allClear ? '✓ Cleared' : `NPR ${balance.toLocaleString()}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fee type badges */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 200 }}>
+                  {studentFees.map(f => {
+                    const cfg = STATUS_CONFIG[f.status] || STATUS_CONFIG.pending
+                    return (
+                      <span key={f.id} style={{
+                        fontSize: 10, padding: '2px 7px', borderRadius: 20,
+                        background: cfg.bg, color: cfg.color,
+                        fontWeight: 600, textTransform: 'capitalize',
+                      }}>
+                        {f.fee_type}
+                      </span>
+                    )
+                  })}
+                </div>
+
+                {/* Expand button */}
+                <button
+                  onClick={() => setExpanded(e => ({ ...e, [s.id]: !e[s.id] }))}
+                  className="btn btn-ghost"
+                  style={{ flexShrink: 0, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <span style={{ fontSize: 12 }}>Details</span>
+                </button>
+              </div>
+
+              {/* Expanded detail rows */}
+              {isExpanded && (
+                <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '120px 100px 130px 100px 120px 1fr', gap: 8, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+                    {['FEE TYPE','AMOUNT','DUE DATE','STATUS','PAID ON','ACTIONS'].map(h => (
+                      <div key={h} style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 500, textTransform: 'uppercase' }}>{h}</div>
+                    ))}
+                  </div>
+                  {studentFees.map(f => {
+                    const cfg = STATUS_CONFIG[f.status] || STATUS_CONFIG.pending
+                    const isEditingThis = editingFee?.id === f.id
+                    return (
+                      <div key={f.id} style={{
+                        display: 'grid', gridTemplateColumns: '120px 100px 130px 100px 120px 1fr',
+                        gap: 8, padding: '10px 16px', alignItems: 'center',
+                        borderBottom: '1px solid var(--border)',
+                        background: f.status === 'overdue' ? '#fff5f5' : f.status === 'paid' ? '#f0fdf4' : 'var(--bg2)',
+                      }}>
+                        {/* Fee type */}
+                        <span className="badge badge-blue" style={{ width: 'fit-content', textTransform: 'capitalize' }}>{f.fee_type}</span>
+
+                        {/* Amount */}
+                        {isEditingThis ? (
+                          <input className="input" type="number"
+                            style={{ padding: '3px 6px', fontSize: 12 }}
+                            value={editingFee.amount}
+                            onChange={e => setEditingFee({ ...editingFee, amount: e.target.value })} />
+                        ) : (
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>NPR {f.amount.toLocaleString()}</div>
+                        )}
+
+                        {/* Due date */}
+                        {isEditingThis ? (
+                          <input className="input" type="date"
+                            style={{ padding: '3px 6px', fontSize: 12 }}
+                            value={editingFee.due_date || ''}
+                            onChange={e => setEditingFee({ ...editingFee, due_date: e.target.value })} />
+                        ) : (
+                          <div style={{ fontSize: 12, color: f.status === 'overdue' ? '#ef4444' : 'var(--text2)' }}>
+                            {f.due_date || '—'}
+                          </div>
+                        )}
+
+                        {/* Status */}
+                        <span className={`badge ${cfg.badge}`}>{cfg.label}</span>
+
+                        {/* Paid on */}
+                        <div style={{ fontSize: 12, color: '#22c55e' }}>
+                          {f.paid_date || '—'}
+                        </div>
+
+                        {/* Actions */}
+                        {isEditingThis ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={async () => {
+                              await api.updateFee(f.id, {
+                                amount: parseFloat(editingFee.amount),
+                                due_date: editingFee.due_date || null,
+                              })
+                              setEditingFee(null)
+                              loadAll()
+                            }} className="btn btn-primary" style={{ fontSize: 11, padding: '2px 8px' }}>Save</button>
+                            <button onClick={() => setEditingFee(null)} className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}>Cancel</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            <button onClick={() => setEditingFee({ id: f.id, amount: f.amount, due_date: f.due_date || '' })}
+                              className="btn btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}>Edit</button>
+                            {f.status !== 'paid' && f.status !== 'waived' && (
+                              <button onClick={() => handleMarkPaid(f.id)} className="btn btn-ghost"
+                                style={{ fontSize: 11, padding: '2px 8px', color: '#22c55e', borderColor: '#22c55e' }}>✓ Paid</button>
+                            )}
+                            {f.status !== 'overdue' && f.status !== 'paid' && f.status !== 'waived' && (
+                              <button onClick={() => handleUpdateStatus(f.id, 'overdue')} className="btn btn-ghost"
+                                style={{ fontSize: 11, padding: '2px 8px', color: '#ef4444', borderColor: '#ef4444' }}>Overdue</button>
+                            )}
+                            {f.status !== 'waived' && f.status !== 'paid' && (
+                              <button onClick={() => handleUpdateStatus(f.id, 'waived')} className="btn btn-ghost"
+                                style={{ fontSize: 11, padding: '2px 8px', color: '#94a3b8', borderColor: '#94a3b8' }}>Waive</button>
+                            )}
+                            {(f.status === 'paid' || f.status === 'waived' || f.status === 'overdue') && (
+                              <button onClick={() => handleUpdateStatus(f.id, 'pending')} className="btn btn-ghost"
+                                style={{ fontSize: 11, padding: '2px 8px', color: '#f59e0b', borderColor: '#f59e0b' }}>Reset</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

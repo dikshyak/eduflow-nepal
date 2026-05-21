@@ -189,10 +189,12 @@ class FeeCreate(BaseModel):
 
 
 class FeeUpdate(BaseModel):
-    status: Optional[FeeStatus] = None
+    status:    Optional[FeeStatus] = None
     paid_date: Optional[str] = None
-    due_date: Optional[str] = None
-    note: Optional[str] = None
+    due_date:  Optional[str] = None
+    note:      Optional[str] = None
+    amount:    Optional[float] = None
+    fee_type:  Optional[str] = None
 
 class FeeResponse(BaseModel):
     id: int

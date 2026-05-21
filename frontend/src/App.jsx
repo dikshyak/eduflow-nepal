@@ -45,8 +45,20 @@ export default function App() {
         padding: '1.25rem 0',
       }}>
         <div style={{ padding: '0 1.25rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--primary)' }}>EduFlow</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>School ERP Nepal</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: 'var(--primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>E</span>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>EduFlow</div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1, letterSpacing: '0.05em' }}>NEPAL ERP</div>
+            </div>
+          </div>
         </div>
 
         <nav style={{ flex: 1, padding: '0.75rem 0.75rem' }}>

@@ -68,4 +68,6 @@ async def update_fee(
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(fee, field, value)
 
+    await db.commit()
+    await db.refresh(fee)
     return fee

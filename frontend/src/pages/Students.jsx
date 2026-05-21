@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Trash2, UserCheck, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, Trash2, UserCheck, RefreshCw, ChevronLeft, ChevronRight, X, Calendar, BarChart2, DollarSign } from 'lucide-react'
 import { api } from '../api'
+
 
 const PAGE_SIZE = 10
 
@@ -14,6 +15,9 @@ export default function Students() {
   const [showForm, setShowForm] = useState(false)
   const [adding,   setAdding]   = useState(false)
   const [form,     setForm]     = useState({ full_name: '', roll_no: '', grade: '', phone: '', parent_name: '', parent_phone: '' })
+  const [selectedStudent, setSelectedStudent] = useState(null)
+  const [studentDetail,   setStudentDetail]   = useState({ att: null, marks: [], fees: [] })
+  const [detailLoading,   setDetailLoading]   = useState(false)
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -63,6 +67,29 @@ export default function Students() {
       load(page)
     } catch {
       setError('Failed to delete')
+    }
+  }
+
+  const openStudent = async (student) => {
+    setSelectedStudent(student)
+    setDetailLoading(true)
+    try {
+      const [attRes, marksRes, feesRes, examsRes] = await Promise.all([
+        api.getAttSummary(student.id),
+        api.getMarks(student.id),
+        api.getStudentFees(student.id),
+        api.getExams(),
+      ])
+      setStudentDetail({
+        att: attRes.data,
+        marks: marksRes.data,
+        fees: feesRes.data,
+        exams: examsRes.data,
+      })
+    } catch {
+      setStudentDetail({ att: null, marks: [], fees: [], exams: [] })
+    } finally {
+      setDetailLoading(false)
     }
   }
 
@@ -176,7 +203,10 @@ export default function Students() {
               {students.map(s => (
                 <tr key={s.id}>
                   <td style={{ fontFamily: 'monospace', color: 'var(--text2)' }}>{s.roll_no}</td>
-                  <td style={{ fontWeight: 500 }}>{s.full_name}</td>
+                  <td style={{ fontWeight: 500, color: 'var(--primary)', cursor: 'pointer' }}
+                    onClick={() => openStudent(s)}>
+                    {s.full_name}
+                  </td>
                   <td><span className="badge badge-blue">Grade {s.grade}</span></td>
                   <td style={{ color: 'var(--text2)' }}>{s.phone || '—'}</td>
                   <td style={{ color: 'var(--text2)' }}>{s.parent_name || '—'}</td>
@@ -234,6 +264,136 @@ export default function Students() {
               Next <ChevronRight size={14} />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Student drawer */}
+      {selectedStudent && (
+        <div style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0,
+          width: 420, background: 'var(--bg)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+          zIndex: 100, overflowY: 'auto', padding: '1.5rem',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{selectedStudent.full_name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                Roll {selectedStudent.roll_no} · Grade {selectedStudent.grade}
+              </div>
+            </div>
+            <button onClick={() => setSelectedStudent(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: 4 }}>
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Contact */}
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Contact</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.8 }}>
+              <div>Phone: {selectedStudent.phone || '—'}</div>
+              <div>Parent: {selectedStudent.parent_name || '—'}</div>
+              <div>Parent phone: {selectedStudent.parent_phone || '—'}</div>
+            </div>
+          </div>
+
+          {detailLoading ? (
+            <div style={{ textAlign: 'center', color: 'var(--text3)', padding: 20 }}>Loading...</div>
+          ) : (
+            <>
+              {/* Attendance summary */}
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <Calendar size={14} color="var(--text3)" />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Attendance</span>
+                </div>
+                {studentDetail.att ? (
+                  <div>
+                    <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                      {[
+                        { label: 'Present', value: studentDetail.att.present, color: '#22c55e' },
+                        { label: 'Absent',  value: studentDetail.att.absent,  color: '#ef4444' },
+                        { label: 'Late',    value: studentDetail.att.late,     color: '#f59e0b' },
+                      ].map(item => (
+                        <div key={item.label} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: item.color }}>{item.value}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.label}</div>
+                        </div>
+                      ))}
+                      <div style={{ textAlign: 'center', marginLeft: 'auto' }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: studentDetail.att.percentage < 75 ? '#ef4444' : '#22c55e' }}>
+                          {studentDetail.att.percentage}%
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>Overall</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: 'var(--bg3)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 3,
+                        width: `${studentDetail.att.percentage}%`,
+                        background: studentDetail.att.percentage < 75 ? '#ef4444' : '#22c55e',
+                        transition: 'width 0.5s',
+                      }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--text3)' }}>No attendance records</div>
+                )}
+              </div>
+
+              {/* Marks */}
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <BarChart2 size={14} color="var(--text3)" />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Marks</span>
+                </div>
+                {studentDetail.marks.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text3)' }}>No marks recorded</div>
+                ) : (
+                  studentDetail.marks.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                        {studentDetail.exams?.find(e => e.id === m.exam_id)?.subject || `Exam #${m.exam_id}`}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                        {studentDetail.exams?.find(e => e.id === m.exam_id)?.name || ''}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{m.marks}</span>
+                        <span className={`badge ${m.grade === 'F' ? 'badge-red' : 'badge-green'}`}>{m.grade}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Fees */}
+              <div className="card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <DollarSign size={14} color="var(--text3)" />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Fees</span>
+                </div>
+                {studentDetail.fees.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text3)' }}>No fee records</div>
+                ) : (
+                  studentDetail.fees.map(f => (
+                    <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div>
+                        <div style={{ fontSize: 13, color: 'var(--text)' }}>NPR {f.amount.toLocaleString()}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>{f.fee_type} · {f.due_date || '—'}</div>
+                      </div>
+                      <span className={`badge ${f.status === 'paid' ? 'badge-green' : f.status === 'overdue' ? 'badge-red' : 'badge-gray'}`}>
+                        {f.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

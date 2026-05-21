@@ -254,6 +254,7 @@ export default function Marks() {
                         <th>Marks</th>
                         <th>Grade</th>
                         <th>Result</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -272,6 +273,14 @@ export default function Marks() {
                             <span className={`badge ${r.marks >= (selectedExamData?.pass_marks || 40) ? 'badge-green' : 'badge-red'}`}>
                               {r.marks >= (selectedExamData?.pass_marks || 40) ? 'Pass' : 'Fail'}
                             </span>
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => setMarkForm({ student_id: String(r.student_id), marks: String(r.marks) })}
+                              className="btn btn-ghost"
+                              style={{ fontSize: 11, padding: '3px 8px' }}>
+                              Edit
+                            </button>
                           </td>
                         </tr>
                       ))}
