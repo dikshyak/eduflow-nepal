@@ -7,49 +7,35 @@ pytestmark = pytest.mark.asyncio
 class TestAttendance:
 
     async def test_mark_bulk_attendance(self, client: AsyncClient, admin_token: str, seeded_school_and_admin):
-        # First create a student
         student = await client.post(
             "/students",
             json={"roll_no": "001", "full_name": "Test Student"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
-        # Mark attendance
         resp = await client.post(
             "/attendance/bulk",
-            json={
-                "date": "2026-05-21",
-                "records": [
-                    {"student_id": student_id, "date": "2026-05-21", "status": "present"}
-                ]
-            },
+            json={"date": "2026-05-21", "records": [{"student_id": student_id, "date": "2026-05-21", "status": "present"}]},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 201
         assert resp.json()["created"] == 1
 
     async def test_mark_attendance_updates_existing(self, client: AsyncClient, admin_token: str, seeded_school_and_admin):
-        # Create student
         student = await client.post(
             "/students",
             json={"roll_no": "002", "full_name": "Test Student 2"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
-        # Mark present
         await client.post("/attendance/bulk", json={
             "date": "2026-05-21",
             "records": [{"student_id": student_id, "date": "2026-05-21", "status": "present"}]
         }, headers={"Authorization": f"Bearer {admin_token}"})
-
-        # Mark absent (update)
         resp = await client.post("/attendance/bulk", json={
             "date": "2026-05-21",
             "records": [{"student_id": student_id, "date": "2026-05-21", "status": "absent"}]
         }, headers={"Authorization": f"Bearer {admin_token}"})
-
         assert resp.status_code == 201
         assert resp.json()["updated"] == 1
 
@@ -60,12 +46,10 @@ class TestAttendance:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
         await client.post("/attendance/bulk", json={
             "date": "2026-05-21",
             "records": [{"student_id": student_id, "date": "2026-05-21", "status": "late"}]
         }, headers={"Authorization": f"Bearer {admin_token}"})
-
         resp = await client.get(
             f"/attendance/student/{student_id}",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -91,23 +75,18 @@ class TestMarks:
         assert resp.json()["subject"] == "Mathematics"
 
     async def test_add_mark(self, client: AsyncClient, admin_token: str, seeded_school_and_admin):
-        # Create exam
         exam = await client.post(
             "/marks/exams",
             json={"name": "Unit Test", "subject": "Science", "full_marks": 100, "pass_marks": 40},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         exam_id = exam.json()["id"]
-
-        # Create student
         student = await client.post(
             "/students",
             json={"roll_no": "010", "full_name": "Mark Student"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
-        # Add mark
         resp = await client.post(
             "/marks",
             json={"student_id": student_id, "exam_id": exam_id, "marks": 85.0},
@@ -124,14 +103,12 @@ class TestMarks:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         exam_id = exam.json()["id"]
-
         student = await client.post(
             "/students",
             json={"roll_no": "011", "full_name": "Over Student"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
         resp = await client.post(
             "/marks",
             json={"student_id": student_id, "exam_id": exam_id, "marks": 110.0},
@@ -146,8 +123,7 @@ class TestMarks:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         exam_id = exam.json()["id"]
-
-        for i, (roll, name, score) in enumerate([("020", "Alice", 90), ("021", "Bob", 75), ("022", "Charlie", 85)]):
+        for roll, name, score in [("020", "Alice", 90), ("021", "Bob", 75), ("022", "Charlie", 85)]:
             student = await client.post(
                 "/students",
                 json={"roll_no": roll, "full_name": name},
@@ -158,7 +134,6 @@ class TestMarks:
                 json={"student_id": student.json()["id"], "exam_id": exam_id, "marks": float(score)},
                 headers={"Authorization": f"Bearer {admin_token}"},
             )
-
         resp = await client.get(
             f"/marks/exam/{exam_id}/rankings",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -180,7 +155,6 @@ class TestFees:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
         resp = await client.post(
             "/fees",
             json={"student_id": student_id, "amount": 3500.0, "fee_type": "tuition"},
@@ -197,14 +171,12 @@ class TestFees:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
         fee = await client.post(
             "/fees",
             json={"student_id": student_id, "amount": 3500.0, "fee_type": "tuition"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         fee_id = fee.json()["id"]
-
         resp = await client.patch(
             f"/fees/{fee_id}",
             json={"status": "paid", "paid_date": "2026-05-21"},
@@ -220,14 +192,12 @@ class TestFees:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         student_id = student.json()["id"]
-
         await client.post("/fees",
             json={"student_id": student_id, "amount": 3500.0, "fee_type": "tuition"},
             headers={"Authorization": f"Bearer {admin_token}"})
         await client.post("/fees",
             json={"student_id": student_id, "amount": 1500.0, "fee_type": "exam"},
             headers={"Authorization": f"Bearer {admin_token}"})
-
         resp = await client.get(
             f"/fees/student/{student_id}",
             headers={"Authorization": f"Bearer {admin_token}"},

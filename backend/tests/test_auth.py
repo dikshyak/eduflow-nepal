@@ -17,7 +17,7 @@ class TestAuth:
         data = resp.json()
         assert "access_token" in data
         assert "refresh_token" in data
-        assert data["user_role"] == "teacher"  # always teacher, never admin
+        assert data["user_role"] == "teacher"
 
     async def test_register_weak_password(self, client: AsyncClient):
         resp = await client.post("/auth/register", json={
@@ -29,7 +29,7 @@ class TestAuth:
 
     async def test_register_duplicate_email(self, client: AsyncClient, seeded_school_and_admin):
         resp = await client.post("/auth/register", json={
-            "email": "admin@test.com",  # already exists
+            "email": "admin@test.com",
             "password": "Admin@1234",
             "full_name": "Duplicate",
         })
@@ -56,7 +56,6 @@ class TestAuth:
             "email": "admin@test.com", "password": "Admin@1234"
         })
         refresh_token = login.json()["refresh_token"]
-
         resp = await client.post("/auth/refresh", json={"refresh_token": refresh_token})
         assert resp.status_code == 200
         assert "access_token" in resp.json()
@@ -91,7 +90,6 @@ class TestStudents:
         assert "already exists" in resp.json()["detail"]
 
     async def test_list_students_paginated(self, client: AsyncClient, admin_token: str):
-        # Create 5 students
         for i in range(5):
             await client.post(
                 "/students",
@@ -114,7 +112,6 @@ class TestStudents:
         await client.post("/students",
             json={"roll_no": "002", "full_name": "Bina Thapa"},
             headers={"Authorization": f"Bearer {admin_token}"})
-
         resp = await client.get(
             "/students?search=Aarav",
             headers={"Authorization": f"Bearer {admin_token}"},
